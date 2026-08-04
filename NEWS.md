@@ -12,6 +12,9 @@
 - Improve performance for some functions by using
   `Spectra::rbindlistWithRownames()` to merge `data.frame`s.
 - Replace the *msdata* package for test data files with *MsDatahub*.
+- Add optional `backend = "lcmsPlot"` argument to `plotAdjustedRtime()` and to
+  the `plot()` method (`type = "XIC"`) for `XcmsExperiment` objects, delegating
+  rendering to the (suggested) *lcmsPlot* package for *ggplot2*-based figures.
 
 ## Changes in version 4.9.3
 

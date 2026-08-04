@@ -4,6 +4,17 @@
 ## provide a XIC plot.
 ## plotXIC
 
+#' Ensure the suggested 'lcmsPlot' package is available for `backend`
+#' `"lcmsPlot"`.
+#'
+#' @noRd
+.xmse_require_lcmsplot <- function() {
+    if (!requireNamespace("lcmsPlot", quietly = TRUE))
+        stop("'backend = \"lcmsPlot\"' requires the 'lcmsPlot' package. ",
+             "Install it from ",
+             "github.com/computational-metabolomics/lcmsPlot", call. = FALSE)
+}
+
 #' @title Visualization of Alignment Results
 #'
 #' @description
@@ -48,6 +59,13 @@
 #' @param ylim optional `numeric(2)` with the upper and lower limits on
 #'     the y-axis.b
 #'
+#' @param backend `character(1)` defining the plotting backend. The default
+#'     `backend = "base"` uses base R graphics. With `backend = "lcmsPlot"`
+#'     the plot is generated with the (suggested) *lcmsPlot* package
+#'     (`lcmsPlot::lp_rt_diff_plot()`), producing a *ggplot2*-based figure;
+#'     in that case the function returns the plot object invisibly and most
+#'     of the base-graphics styling arguments are ignored.
+#'
 #' @param ... Additional arguments to be passed down to the `plot`
 #'     function.
 #'
@@ -73,6 +91,11 @@
 #' ## Visualize the impact of the alignment.
 #' plotAdjustedRtime(res, adjusted = FALSE)
 #' grid()
+#'
+#' ## Alternatively, generate the same visualization with the 'lcmsPlot'
+#' ## package (if installed).
+#' if (requireNamespace("lcmsPlot", quietly = TRUE))
+#'     plotAdjustedRtime(res, backend = "lcmsPlot")
 plotAdjustedRtime <- function(object, col = "#00000080", lty = 1, lwd = 1,
                               type = "l", adjustedRtime = TRUE,
                               xlab = ifelse(adjustedRtime,
@@ -81,13 +104,22 @@ plotAdjustedRtime <- function(object, col = "#00000080", lty = 1, lwd = 1,
                               ylab = expression(rt[adj]-rt[raw]),
                               peakGroupsCol = "#00000060",
                               peakGroupsPch = 16, peakGroupsLty = 3,
-                              ylim, ...) {
+                              ylim, backend = c("base", "lcmsPlot"), ...) {
     if (!(inherits(object, "XCMSnExp") |
           inherits(object, "XcmsExperiment")))
         stop("'object' needs to be either a 'XcmsExperiment' or ",
              "'XCMSnExp' object.")
     if (!hasAdjustedRtime(object))
         warning("No alignment/retention time correction results present.")
+    backend <- match.arg(backend)
+    if (backend == "lcmsPlot") {
+        .xmse_require_lcmsplot()
+        p <- lcmsPlot::lcmsPlot(object) +
+            lcmsPlot::lp_rt_diff_plot() +
+            lcmsPlot::lp_get_plot()
+        print(p)
+        return(invisible(p))
+    }
     rt <- rtime(object, adjusted = FALSE)
     rtadj <- rtime(object, adjusted = TRUE)
     .plot_adjusted_rtime(rt, rtadj, fromFile(object), col = col, lty = lty,
@@ -251,6 +283,17 @@ plotAdjustedRtime <- function(object, col = "#00000080", lty = 1, lwd = 1,
 #' @param ylab For `plotChromPeaks`: `character(1)` defining the
 #'     y-axis label.
 #'
+#' @param backend `character(1)` defining the plotting backend. The default
+#'     `backend = "base"` uses base R graphics. With `backend = "lcmsPlot"`
+#'     the plot is generated with the (suggested) *lcmsPlot* package and the
+#'     function returns the *ggplot2*-based figure invisibly.
+#'     `plotChromPeaks` combines `lcmsPlot::lp_intensity_map()` with
+#'     `lcmsPlot::lp_chrom_peak_rects()`, so the peak rectangles are drawn on
+#'     top of the m/z-retention time intensity map rather than on an empty
+#'     plot; `add` and `msLevel` are ignored. `plotChromPeakImage` uses
+#'     `lcmsPlot::lp_peak_count_image()`, which honors `binSize`, `log` and
+#'     `xlim` but not `yaxt`.
+#'
 #' @param ... Additional arguments passed to the `plot` (for
 #'     `plotChromPeaks`) and `image` (for
 #'     `plotChromPeakImage`) functions. Ignored for `add = TRUE`.
@@ -271,10 +314,18 @@ plotAdjustedRtime <- function(object, col = "#00000080", lty = 1, lwd = 1,
 #' ## Plot all detected peaks from the second file and restrict the plot to a
 #' ## mz-rt slice
 #' plotChromPeaks(faahko_sub, file = 2, xlim = c(3500, 3600), ylim = c(400, 600))
+#'
+#' ## Alternatively, generate the same visualizations with the 'lcmsPlot'
+#' ## package (if installed).
+#' if (requireNamespace("lcmsPlot", quietly = TRUE)) {
+#'     plotChromPeaks(faahko_sub, backend = "lcmsPlot")
+#'     plotChromPeakImage(faahko_sub, backend = "lcmsPlot")
+#' }
 plotChromPeaks <- function(x, file = 1, xlim = NULL, ylim = NULL,
                            add = FALSE, border = "#00000060", col = NA,
                            xlab = "retention time", ylab = "mz",
-                           main = NULL, msLevel = 1L, ...) {
+                           main = NULL, msLevel = 1L,
+                           backend = c("base", "lcmsPlot"), ...) {
     if (!(is(x, "XCMSnExp") | inherits(x, "XcmsExperiment")))
         stop("'x' is supposed to be an 'XcmsExperiment' or 'XCMSnExp' object.")
     suppressMessages(
@@ -289,6 +340,18 @@ plotChromPeaks <- function(x, file = 1, xlim = NULL, ylim = NULL,
     }
     if (is.null(main))
         main <- basename(fileNames(x_file))
+    if (match.arg(backend) == "lcmsPlot") {
+        .xmse_require_lcmsplot()
+        if (!hasChromPeaks(x_file))
+            stop("No chromatographic peaks present in the selected file.",
+                 call. = FALSE)
+        p <- lcmsPlot::lcmsPlot(x_file) +
+            lcmsPlot::lp_intensity_map(mz_range = ylim, rt_range = xlim) +
+            lcmsPlot::lp_chrom_peak_rects(border = border, fill = col) +
+            lcmsPlot::lp_get_plot()
+        print(p)
+        return(invisible(p))
+    }
     pks <- chromPeaks(x_file, mz = ylim, rt = xlim, msLevel = msLevel)
     ## Initialize plot
     if (!add)
@@ -305,11 +368,21 @@ plotChromPeaks <- function(x, file = 1, xlim = NULL, ylim = NULL,
 plotChromPeakImage <- function(x, binSize = 30, xlim = NULL, log = FALSE,
                                xlab = "retention time", yaxt = par("yaxt"),
                                main = "Chromatographic peak counts",
-                               msLevel = 1L, ...) {
+                               msLevel = 1L,
+                               backend = c("base", "lcmsPlot"), ...) {
     if (!(is(x, "XCMSnExp") | inherits(x, "XcmsExperiment")))
         stop("'x' is supposed to be an 'XcmsExperiment' or 'XCMSnExp' object.")
     if (is.null(xlim))
         xlim <- c(floor(min(rtime(x))), ceiling(max(rtime(x))))
+    if (match.arg(backend) == "lcmsPlot") {
+        .xmse_require_lcmsplot()
+        p <- lcmsPlot::lcmsPlot(x) +
+            lcmsPlot::lp_peak_count_image(bin_size = binSize, log = log,
+                                          rt_range = xlim) +
+            lcmsPlot::lp_get_plot()
+        print(p)
+        return(invisible(p))
+    }
     brks <- seq(xlim[1], xlim[2], by = binSize)
     if (brks[length(brks)] < xlim[2])
         brks <- c(brks, brks[length(brks)] + binSize)
@@ -346,11 +419,29 @@ plotChromPeakImage <- function(x, binSize = 30, xlim = NULL, log = FALSE,
 #' @rdname XcmsExperiment
 setMethod(
     "plot", c("MsExperiment", "missing"),
-    function(x, y, msLevel = 1L, peakCol = "#ff000060", ...) {
+    function(x, y, msLevel = 1L, peakCol = "#ff000060",
+             backend = c("base", "lcmsPlot"), ...) {
         if (length(msLevel) > 1)
             warning("'plot' does support only a single MS level. ",
                     "Will use msLevel[1].")
         msLevel <- msLevel[1L]
+        backend <- match.arg(backend)
+        if (backend == "lcmsPlot") {
+            .xmse_require_lcmsplot()
+            sps <- filterMsLevel(spectra(x), msLevel = msLevel)
+            rtr <- range(rtime(sps))
+            mzr <- range(unlist(mz(sps), use.names = FALSE))
+            p <- lcmsPlot::lcmsPlot(x) +
+                lcmsPlot::lp_intensity_map(mz_range = mzr, rt_range = rtr) +
+                lcmsPlot::lp_facets(facets = "sample_id")
+            ## Overlay the detected peaks, matching the rectangles the base
+            ## backend draws with 'peakCol'.
+            if (inherits(x, "XcmsExperiment") && hasChromPeaks(x))
+                p <- p + lcmsPlot::lp_chrom_peak_rects(border = peakCol[1L])
+            p <- p + lcmsPlot::lp_get_plot()
+            print(p)
+            return(invisible(p))
+        }
         .xmse_plot_xic(x, msLevel = msLevel, peakCol = peakCol, ...)
     })
 

@@ -365,7 +365,11 @@
 #'   plot should be created. If `x` is a `XcmsExperiment` with available
 #'   identified chromatographic peaks, also the region defining the peaks
 #'   are indicated with a rectangle. Parameter `peakCol` allows to define the
-#'   color of the border for these rectangles.
+#'   color of the border for these rectangles. With `backend = "lcmsPlot"` the
+#'   plot is instead generated with the (suggested) *lcmsPlot* package as a
+#'   *ggplot2*-based m/z - retention time intensity map, with the identified
+#'   chromatographic peaks overlaid as rectangles in the `peakCol` color; the
+#'   plot object is returned invisibly.
 #'
 #' - `plotAdjustedRtime()`: plot the alignment results; see
 #'   [plotAdjustedRtime()] for more information.
@@ -566,6 +570,14 @@
 #' @param peakCol For `plot()`: defines the border color of the rectangles
 #'     indicating the identified chromatographic peaks. Only a single color
 #'     is supported. Defaults to `peakCol = "#ff000060".
+#'
+#' @param backend For `plot()`, `plotAdjustedRtime()`, `plotChromPeaks()` and
+#'     `plotChromPeakImage()`: `character(1)` defining the plotting backend.
+#'     The default `backend = "base"` uses base R graphics. With
+#'     `backend = "lcmsPlot"` the plot is generated with the (suggested)
+#'     *lcmsPlot* package (version 1.1.8 or later), producing a
+#'     *ggplot2*-based figure that is returned invisibly. Base-graphics
+#'     styling arguments are ignored in that case.
 #'
 #' @param ppm For `chromPeaks()` and `featureDefinitions()`: optional
 #'     `numeric(1)` specifying the ppm by which the m/z range (defined by

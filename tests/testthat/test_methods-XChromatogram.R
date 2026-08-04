@@ -86,6 +86,22 @@ test_that("plot,XChromatogram works", {
                                                  "#ff000060", "#00000040"))
 })
 
+test_that("plot,XChromatogram lcmsPlot backend works", {
+    skip_if_not_installed("lcmsPlot")
+    chr <- Chromatogram(rtime = 1:10,
+                        intensity = c(4, 12, 18, 24, 23, 18, 15, 3, 2, 5))
+    xchr <- as(chr, "XChromatogram")
+    pks <- matrix(nrow = 2, ncol = 6)
+    colnames(pks) <- .CHROMPEAKS_REQ_NAMES
+    pks[1, ] <- c(4, 2, 8, 24, 24, NA)
+    pks[2, ] <- c(9, 7, 10, 2, 2, NA)
+    chromPeaks(xchr) <- pks
+    res <- plot(xchr, backend = "lcmsPlot")
+    expect_true(inherits(res, c("ggplot", "patchwork")))
+    res2 <- plot(xchr, backend = "lcmsPlot", peakType = "none")
+    expect_true(inherits(res2, c("ggplot", "patchwork")))
+})
+
 test_that("filterMz,filterRt,XChromatogram work", {
     skip_on_os(os = "windows", arch = "i386")
 

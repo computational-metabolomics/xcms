@@ -77,7 +77,18 @@ setMethod("sortMz", "xcmsRaw", function(object) {
 
 ############################################################
 ## plotTIC
-setMethod("plotTIC", "xcmsRaw", function(object, ident = FALSE, msident = FALSE) {
+setMethod("plotTIC", "xcmsRaw", function(object, ident = FALSE, msident = FALSE,
+                                         backend = c("base", "lcmsPlot")) {
+    backend <- match.arg(backend)
+    if (backend == "lcmsPlot") {
+        .xmse_require_lcmsplot()
+        xl <- lcmsPlot::XcmsRawList(object)
+        p <- lcmsPlot::lcmsPlot(xl) +
+            lcmsPlot::lp_chromatogram(aggregation_fun = "sum") +
+            lcmsPlot::lp_get_plot()
+        print(p)
+        return(invisible(p))
+    }
 
     if (all(object@tic == 0))
         points <- cbind(object@scantime, rawEIC(object,mzrange=range(object@env$mz))$intensity)  else
@@ -783,7 +794,24 @@ setMethod("plotRaw", "xcmsRaw", function(object,
                                          mzrange = numeric(),
                                          rtrange = numeric(),
                                          scanrange = numeric(),
-                                         log=FALSE,title='Raw Data' ) {
+                                         log=FALSE,title='Raw Data',
+                                         backend = c("base", "lcmsPlot")) {
+    backend <- match.arg(backend)
+    if (backend == "lcmsPlot") {
+        .xmse_require_lcmsplot()
+        if (length(mzrange) < 2L)
+            mzrange <- range(object@env$mz)
+        if (length(rtrange) < 2L)
+            rtrange <- range(object@scantime)
+        xl <- lcmsPlot::XcmsRawList(object)
+        p <- lcmsPlot::lcmsPlot(xl) +
+            lcmsPlot::lp_intensity_map(mz_range = range(mzrange),
+                                       rt_range = range(rtrange),
+                                       geom = "point") +
+            lcmsPlot::lp_get_plot()
+        print(p)
+        return(invisible(p))
+    }
 
     raw <- rawMat(object, mzrange, rtrange, scanrange, log)
 
@@ -1027,11 +1055,25 @@ setMethod("plotEIC", "xcmsRaw", function(object,
                                          mzrange = numeric(),
                                          rtrange = numeric(),
                                          scanrange = numeric(),
-                                         type="l", add=FALSE, ...)  {
+                                         type="l", add=FALSE,
+                                         backend = c("base", "lcmsPlot"),
+                                         ...)  {
+              backend <- match.arg(backend)
               if(length(mzrange)==0)
                   mzrange <- range(object@env$mz)
               if(length(rtrange)==0)
                   rtrange <- range(object@scantime)
+              if (backend == "lcmsPlot") {
+                  .xmse_require_lcmsplot()
+                  feats <- rbind(c(mzmin = mzrange[1], mzmax = mzrange[2],
+                                   rtmin = rtrange[1], rtmax = rtrange[2]))
+                  xl <- lcmsPlot::XcmsRawList(object)
+                  p <- lcmsPlot::lcmsPlot(xl) +
+                      lcmsPlot::lp_chromatogram(features = feats) +
+                      lcmsPlot::lp_get_plot()
+                  print(p)
+                  return(invisible(p))
+              }
     EIC <-  rawEIC(object,mzrange=mzrange, rtrange=rtrange, scanrange=scanrange)
     points <- cbind(object@scantime[EIC$scan], EIC$intensity)
     if(add){
@@ -1387,9 +1429,26 @@ setMethod("deepCopy", "xcmsRaw", function(object) {
 ## levelplot for xcmsRaw objects; contains code from the image method, but uses the levelplot
 ## from the lattice package.
 setMethod("levelplot", "xcmsRaw", function(x, log=TRUE,
-                                           col.regions=colorRampPalette(brewer.pal(9, "YlOrRd"))(256), ...){
+                                           col.regions=colorRampPalette(brewer.pal(9, "YlOrRd"))(256),
+                                           backend = c("base", "lcmsPlot"),
+                                           ...){
+    backend <- match.arg(backend)
     ## some code taken from plotSurf...
     sel <- profRange(x, ...)
+    if (backend == "lcmsPlot") {
+        .xmse_require_lcmsplot()
+        xl <- lcmsPlot::XcmsRawList(x)
+        p <- lcmsPlot::lcmsPlot(xl) +
+            lcmsPlot::lp_intensity_map(
+                mz_range = range(profMz(x)[sel$massidx]),
+                rt_range = range(x@scantime[sel$scanidx]),
+                x_dim = "mz", y_dim = "rt",
+                fill_scale = ggplot2::scale_fill_gradientn(
+                    colours = col.regions)) +
+            lcmsPlot::lp_get_plot()
+        print(p)
+        return(invisible(p))
+    }
     zvals <- x@env$profile[sel$massidx, sel$scanidx]
     if(log){
         zvals <- log(zvals+max(c(-min(zvals), 1)))
@@ -1494,8 +1553,19 @@ setReplaceMethod("mslevel", "xcmsRaw", function(object, value){
 ############################################################
 ## plotScan
 setMethod("plotScan", "xcmsRaw", function(object, scan, mzrange = numeric(),
-                                          ident = FALSE)
+                                          ident = FALSE,
+                                          backend = c("base", "lcmsPlot"))
       {
+          backend <- match.arg(backend)
+          if (backend == "lcmsPlot") {
+              .xmse_require_lcmsplot()
+              xl <- lcmsPlot::XcmsRawList(object)
+              p <- lcmsPlot::lcmsPlot(xl) +
+                  lcmsPlot::lp_spectra(scan_index = scan) +
+                  lcmsPlot::lp_get_plot()
+              print(p)
+              return(invisible(p))
+          }
           if (scan<1 || scan>length(object@scanindex) ) {
               warning("scan out of range")
               return()
@@ -1537,6 +1607,15 @@ setMethod("plotScan", "xcmsRaw", function(object, scan, mzrange = numeric(),
 setMethod("plotSpec", "xcmsRaw", function(object, ident = FALSE,
                                           vline = numeric(0), ...) {
 
+    ## 'lcmsPlot' has no cross-scan spectrum averaging, which is what this
+    ## method plots. Without this guard 'backend' would be passed on to
+    ## profRange(), which ignores it, and the base plot would be drawn as if
+    ## the request had been honoured.
+    if ("backend" %in% ...names())
+        stop("'plotSpec' has no 'lcmsPlot' backend: lcmsPlot cannot average ",
+             "spectra across scans. Use 'plotScan' for a single scan.",
+             call. = FALSE)
+
     sel <- profRange(object, ...)
 
     title = paste("Averaged Mass Spectrum: ", sel$timelab, " (",
@@ -1556,7 +1635,20 @@ setMethod("plotSpec", "xcmsRaw", function(object, ident = FALSE,
 ############################################################
 ## plotChrom
 setMethod("plotChrom", "xcmsRaw", function(object, base = FALSE, ident = FALSE,
-                                           fitgauss = FALSE, vline = numeric(0), ...) {
+                                           fitgauss = FALSE, vline = numeric(0),
+                                           backend = c("base", "lcmsPlot"),
+                                           ...) {
+    backend <- match.arg(backend)
+    if (backend == "lcmsPlot") {
+        .xmse_require_lcmsplot()
+        xl <- lcmsPlot::XcmsRawList(object)
+        p <- lcmsPlot::lcmsPlot(xl) +
+            lcmsPlot::lp_chromatogram(
+                aggregation_fun = if (isTRUE(base)) "max" else "mean") +
+            lcmsPlot::lp_get_plot()
+        print(p)
+        return(invisible(p))
+    }
 
     sel <- profRange(object, ...)
 

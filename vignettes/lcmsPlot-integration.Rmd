@@ -1,0 +1,575 @@
+---
+title: "Plotting xcms objects with lcmsPlot"
+package: xcms
+output:
+  BiocStyle::html_document:
+    toc_float: true
+vignette: >
+  %\VignetteIndexEntry{Plotting xcms objects with lcmsPlot}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteDepends{xcms,MsExperiment,faahKO,BiocStyle}
+  %\VignettePackage{xcms}
+  %\VignetteKeywords{mass spectrometry, metabolomics, visualisation}
+---
+
+```{r biocstyle, echo = FALSE, results = "asis"}
+BiocStyle::markdown()
+```
+
+**Package**: `r Biocpkg("xcms")`<br />
+**Compiled**: `r date()`
+
+```{r init, message = FALSE, echo = FALSE, results = "hide"}
+library(BiocStyle)
+library(xcms)
+library(MsExperiment)
+library(faahKO)
+register(SerialParam())
+has_lcmsplot <- requireNamespace("lcmsPlot", quietly = TRUE)
+knitr::opts_chunk$set(
+    fig.width = 9, fig.height = 5, fig.align = "center", out.width = "100%",
+    warning = FALSE, message = FALSE
+)
+```
+
+# Introduction
+
+[lcmsPlot](https://bioconductor.org/packages/release/bioc/html/lcmsPlot.html) is an R Bioconductor package designed for visualising
+Liquid Chromatography-Mass Spectrometry (LC-MS) data with high-quality plots
+suitable for publication. The package enables users to generate and customise chromatograms,
+mass traces, spectra, and more with fine-tuned aesthetics and annotation options.
+
+A plot begins with a data object and gains layers with `+`:
+
+```r
+lcmsPlot(data) +
+    lp_chromatogram(features = ...) +
+    lp_spectra(mode = "closest_apex") +
+    lp_facets(facets = "feature_id")
+```
+
+Each `lp_*()` layer either adds something to draw (chromatograms, spectra, mass
+traces, intensity maps, peak densities) or controls how the resulting panels are
+arranged and labelled. The data object can be an `XcmsExperiment` or `XCMSnExp`,
+an `MsExperiment`, a `character` vector of mzML paths, or the output of MZmine,
+MS-DIAL, Compound Discoverer or LipidSearch.
+
+There are two ways to reach it from `xcms`, and this vignette covers both:
+
+- **Directly**, by composing a figure from lcmsPlot layers.
+- **Through `xcms`**, by passing `backend = "lcmsPlot"` to a plotting method you
+  already call. The default `backend = "base"` keeps the original base-R output.
+
+`lcmsPlot` is a *Suggests*-only dependency of `xcms`, and version 1.1.8 or later
+is required:
+
+```r
+BiocManager::install("lcmsPlot")
+```
+
+The development version lives on GitHub:
+
+```r
+remotes::install_github("computational-metabolomics/lcmsPlot")
+```
+
+This vignette is about where the two packages meet. For lcmsPlot itself, i.e., the
+full range of plot types, interoperability with vendor formats, and publication
+theming, see its own vignettes, which are not reproduced here:
+
+```r
+browseVignettes("lcmsPlot")
+vignette("lcms_data_plotting", package = "lcmsPlot")
+vignette("creating_publication_ready_plots", package = "lcmsPlot")
+```
+
+```{r note-no-lcmsplot, echo = FALSE, results = "asis", eval = !has_lcmsplot}
+cat("> **Note:** `lcmsPlot` is not available in this session.",
+    "The base-graphics panels below render normally;",
+    "the lcmsPlot panels are skipped.\n")
+```
+
+# Setup
+
+```{r setup-data, message = FALSE}
+fls <- dir(system.file("cdf", package = "faahKO"),
+           recursive = TRUE, full.names = TRUE)[c(1, 2, 7)]
+pd  <- data.frame(sample = sub("\\.CDF$", "", basename(fls)),
+                  group  = sub("([0-9]+)$", "", sub("\\.CDF$", "",
+                                                    basename(fls))))
+mse <- readMsExperiment(spectraFiles = fls, sampleData = pd)
+
+## XcmsExperiment with detected peaks, grouped, RT-adjusted
+cwp   <- CentWaveParam(noise = 10000, snthresh = 40,
+                       prefilter = c(3, 10000))
+xmse  <- findChromPeaks(mse, param = cwp)
+xmseg <- groupChromPeaks(xmse,
+                         param = PeakDensityParam(sampleGroups = rep(1, 3)))
+xmsegr <- adjustRtime(xmseg, param = PeakGroupsParam(span = 0.4))
+
+## XChromatograms (two m/z windows × three samples) with peaks
+mzr   <- matrix(c(335, 335, 344, 344), ncol = 2, byrow = TRUE)
+xchrs <- findChromPeaks(chromatogram(mse, mz = mzr),
+                        param = CentWaveParam())
+
+## plotChromPeakDensity() operates on a single EIC across samples
+xchr1 <- xchrs[1, , drop = FALSE]
+
+## A single xcmsRaw for the legacy methods
+xraw <- xcmsRaw(fls[1], profstep = 1)
+```
+
+# Why plot with lcmsPlot?
+
+The clearest way to see what the layered interface buys you is to write the
+same figure twice. Because the layers compose, one plot object can hold
+chromatograms, their spectra, peak highlighting and a panel layout at once, and
+each of those is a single line.
+
+The figure below is a good example: for two features in two samples, an
+extracted ion chromatogram with its detected peak shaded, and directly
+underneath it the MS1 spectrum recorded at that peak's apex.
+
+```{r apex-setup}
+xmse_apex <- findChromPeaks(
+    mse, param = CentWaveParam(peakwidth = c(20, 80), noise = 5000,
+                               prefilter = c(6, 5000)))
+
+feats <- rbind(
+    c(mzmin = 334.9, mzmax = 335.1, rtmin = 2700, rtmax = 2900),
+    c(mzmin = 343.9, mzmax = 344.1, rtmin = 2600, rtmax = 2750))
+samples <- c("ko15", "ko16")
+```
+
+## With lcmsPlot
+
+```{r apex-lcms, eval = has_lcmsplot, fig.width = 10, fig.height = 9}
+library(lcmsPlot)
+
+lcmsPlot(xmse_apex, sample_id_column = "sample") +
+    lp_chromatogram(features = feats, sample_ids = samples,
+                    highlight_peaks = TRUE) +
+    lp_spectra(mode = "closest_apex", ms_level = 1) +
+    lp_facets(facets = c("feature_id", "sample_id"), ncol = 2) +
+    lp_legend(position = "bottom") +
+    lp_layout(design = "C\nS\nS")
+```
+
+`lp_spectra(mode = "closest_apex")` is what does the work: it reads the
+retention time of each detected chromatographic peak and pulls the nearest MS1 scan. It needs no m/z or retention
+time arguments of its own because it inherits the features and samples from
+`lp_chromatogram()`. `lp_facets()` then splits *both* panels, since faceting
+happens at the *patchwork* level rather than inside a single `ggplot`, and
+`lp_layout(design = "C\nS\nS")` gives the chromatogram one row and the spectrum
+two. The letters are the first letters of the dataset names.
+
+## The same figure with base xcms
+
+```{r apex-base, fig.width = 10, fig.height = 9}
+layout(matrix(seq_len(2 * nrow(feats) * length(samples)),
+              nrow = 2 * nrow(feats)))
+par(mar = c(4, 4, 2, 1))
+
+for (s in samples) {
+    i <- match(s, sampleData(xmse_apex)$sample)
+    sps <- filterMsLevel(spectra(xmse_apex[i]), 1L)
+    for (k in seq_len(nrow(feats))) {
+        chr <- chromatogram(xmse_apex[i], mz = feats[k, 1:2],
+                            rt = feats[k, 3:4])
+        plot(chr, main = paste(s, "- m/z", round(feats[k, 1], 3)))
+        pks <- chromPeaks(chr)
+        apex <- pks[which.max(pks[, "maxo"]), "rt"]
+        sp <- sps[which.min(abs(rtime(sps) - apex))]
+        plot(mz(sp)[[1]],
+             100 * intensity(sp)[[1]] / max(intensity(sp)[[1]]),
+             type = "h", xlab = "m/z", ylab = "Rel. intensity (%)",
+             main = paste("apex RT", round(apex), "s"))
+    }
+}
+```
+
+## The difference
+
+Apart from the lines differences (seven lines against nineteen), the base
+version has to make every decision explicitly: how many panels there are and how
+they are arranged (`layout()`), which sample maps to which index, how to find
+the apex from the peak matrix, how to locate the nearest MS1 scan, and how to
+normalise the spectrum. Each of those is a place to get it wrong, and each is
+re-derived by hand every time you want a variation on the figure.
+
+The lcmsPlot version states what should be in the figure declaratively and leaves the
+arrangement to the layers. Changing it is proportionate: a third feature is one
+more row in `feats`, MS2 spectra instead of MS1 is `ms_level = 2`, and spectra
+across the whole peak rather than at its apex is
+`mode = "across_peak", interval = 10`. In the base version each of those means
+editing the loop and the layout matrix.
+
+# Composing figures
+
+Everything beyond the data layers is presentation.
+The same extracted ion chromatograms can be coloured by an experimental factor, split into panels, annotated, or relabelled without altering how they were extracted.
+
+```{r compose, eval = has_lcmsplot, fig.width = 10, fig.height = 5}
+lcmsPlot(xmse_apex, sample_id_column = "sample") +
+    lp_chromatogram(features = feats) +
+    lp_arrange(group_by = "group") +
+    lp_facets(facets = "feature_id", ncol = 2, free_x = TRUE) +
+    lp_labels(title = "Extracted ion chromatograms by sample group",
+              legend = "Group") +
+    lp_legend(position = "bottom")
+```
+
+`lp_arrange()` picked the colour aesthetic off the `group` column of the sample
+metadata, so the two KO samples and the WT sample are distinguished without
+naming a single colour; `lp_facets()` split the two features into their own
+panels and gave each its own retention time range.
+
+| Layer | Controls |
+|---|---|
+| `lp_arrange(group_by)` | which metadata column becomes the colour aesthetic |
+| `lp_facets(facets, ncol, nrow, free_x, free_y)` | splitting into panels by one or more metadata columns |
+| `lp_grid(rows, cols, free_x, free_y)` | a panel matrix defined by a row and a column factor |
+| `lp_layout(design)` | how the panel *types* stack |
+| `lp_labels(title, legend)` | the plot title and the legend title |
+| `lp_legend(position)` | `"top"`, `"right"`, `"bottom"`, `"left"` or `"inside"` |
+| `lp_rt_line(intercept, line_type, color)` | a vertical marker at a retention time |
+
+# Plotting xcms objects with `backend`
+
+The rest of this vignette works through the `xcms` side: every plotting method
+that accepts `backend = "lcmsPlot"`, shown next to its base-R output.
+
+| Class | Method | Status | Notes |
+|---|---|---|---|
+| `XcmsExperiment` | `plotAdjustedRtime()` | ✅ Full | `lp_rt_diff_plot()` |
+| `XcmsExperiment` | `plot(..., type = "XIC")` | ✅ Full | `lp_intensity_map()` + `lp_chrom_peak_rects()` |
+| `XcmsExperiment` | `plotChromPeaks()` | ✅ Full | `lp_intensity_map()` + `lp_chrom_peak_rects()` |
+| `XcmsExperiment` | `plotChromPeakImage()` | ✅ Full | `lp_peak_count_image()` |
+| `XcmsExperiment` | `plotPrecursorIons()` | ❌ None | No lcmsPlot precursor scatter |
+| `XChromatogram` | `plot()` | ✅ Full | `lp_chromatogram(highlight_peaks_mode = peakType)` |
+| `XChromatograms` | `plot()` | ✅ Full | `lp_chromatogram` + `lp_facets` |
+| `XChromatograms` | `plotChromPeakDensity()` | ✅ Full | `lp_chromatogram` + `lp_peak_density()` |
+| `XChromatograms` | `plotChromatogramsOverlay()` | ✅ Full | `lp_chromatogram` + `lp_facets` |
+| `xcmsRaw` | `plotTIC()` | ✅ Full | `lp_chromatogram(aggregation_fun = "sum")` |
+| `xcmsRaw` | `plotEIC()` | ✅ Full | `lp_chromatogram(features = ...)` |
+| `xcmsRaw` | `plotChrom()` | ✅ Full | `aggregation_fun` `"max"` / `"mean"` |
+| `xcmsRaw` | `plotScan()` | ✅ Full | `lp_spectra(scan_index = scan)` |
+| `xcmsRaw` | `plotSpec()` | ❌ None | lcmsPlot has no cross-scan spectrum averaging |
+| `xcmsRaw` | `plotRaw()` | ✅ Full | `lp_intensity_map(geom = "point")` |
+| `xcmsRaw` | `levelplot()` | ⚠️ Partial | Axes and `col.regions` carry across; lcmsPlot draws centroids, not the gridded profile matrix |
+| `xcmsRaw` | `plotPeaks()` | ❌ None | Needs `findPeaks` matrix |
+| `xcmsRaw` | `plotSurf()` | ❌ None | 3D `rgl`; lcmsPlot is `ggplot2` |
+| `xcmsRaw` | `image()` | ❌ None | Out of scope |
+
+Legend: ✅ Full — the lcmsPlot rendering reproduces the original; ⚠️ Partial —
+some arguments / visual details do not carry over (see notes column and the
+end-of-section bullets below); ❌ None — no lcmsPlot equivalent.
+
+Throughout, base-graphics styling arguments (`col`, `lty`, `lwd`, `pch`,
+`type`, …) and the interactive `ident` arguments are ignored on the lcmsPlot
+branch: lcmsPlot applies its own scales and produces a static figure.
+
+# XcmsExperiment
+
+## `plotAdjustedRtime()`
+
+```{r xmse-rtadj-base}
+plotAdjustedRtime(xmsegr)
+grid()
+```
+
+```{r xmse-rtadj-lcms, eval = has_lcmsplot}
+plotAdjustedRtime(xmsegr, backend = "lcmsPlot")
+```
+
+*Carries across:* the requirement that alignment has been performed.
+*Dropped on the lcmsPlot branch:* `col`, `lty`, `lwd`, `type`, `peakGroupsCol`,
+`peakGroupsPch`, `peakGroupsLty`, `ylim` and other base-graphics styling.
+
+## `plot(x, type = "XIC")`
+
+```{r xmse-xic-base}
+tmp <- filterMz(filterRt(xmse, rt = c(2550, 2800)), mz = c(342.5, 344.5))
+plot(tmp)
+```
+
+```{r xmse-xic-lcms, eval = has_lcmsplot}
+plot(tmp, backend = "lcmsPlot")
+```
+
+Both panels show the m/z–RT intensity map with the detected chromatographic
+peaks overlaid as rectangles; `peakCol` sets the rectangle border on either
+backend. The base panel adds the marginal chromatogram and spectrum of the
+classical three-part XIC, which lcmsPlot does not draw.
+
+## `plotChromPeaks()`
+
+```{r xmse-chrompeaks-base}
+plotChromPeaks(xmse, file = 1)
+```
+
+```{r xmse-chrompeaks-lcms, eval = has_lcmsplot}
+plotChromPeaks(xmse, file = 1, backend = "lcmsPlot")
+```
+
+The base method draws the peak rectangles on an empty frame. The lcmsPlot
+branch draws the same rectangles on top of the intensity map of that file, so
+each peak can be read against the signal it was detected in.
+
+Note that the faahKO files are m/z-binned, so every peak has
+`mzmin == mzmax` and the rectangles collapse to segments; on profile or
+centroid data they are boxes with a real m/z extent.
+
+*Dropped on the lcmsPlot branch:* `add` (the map always starts a new panel) and
+`msLevel`.
+
+## `plotChromPeakImage()`
+
+```{r xmse-peakimage-base}
+plotChromPeakImage(xmse, binSize = 30)
+```
+
+```{r xmse-peakimage-lcms, eval = has_lcmsplot}
+plotChromPeakImage(xmse, binSize = 30, backend = "lcmsPlot")
+```
+
+`binSize`, `log` and `xlim` carry across, and the bin counts match those of the
+base method. Samples keep their injection order on the y-axis. *Dropped:*
+`yaxt`.
+
+# XChromatogram / XChromatograms
+
+## `plot,XChromatogram` — single trace
+
+```{r xchr-base}
+xchr <- xchrs[[1, 1]]                   # row 1 (m/z 335), sample 1
+plot(xchr)
+```
+
+```{r xchr-lcms, eval = has_lcmsplot}
+plot(xchr, backend = "lcmsPlot")
+```
+
+`peakType` (`"polygon"`, `"rectangle"`, `"point"`, `"none"`) maps onto
+`lcmsPlot::lp_chromatogram(highlight_peaks_mode = …)`:
+
+```{r xchr-modes, eval = has_lcmsplot}
+plot(xchr, backend = "lcmsPlot", peakType = "rectangle")
+plot(xchr, backend = "lcmsPlot", peakType = "none")
+```
+
+## `plot,XChromatograms` — matrix layout
+
+```{r xchrs-base}
+plot(xchrs)
+```
+
+```{r xchrs-lcms, eval = has_lcmsplot}
+plot(xchrs, backend = "lcmsPlot")
+```
+
+When the matrix has multiple rows lcmsPlot facets by the auto-generated
+`feature_id`; for a single row it facets by `sample_id`.
+
+*Dropped on the lcmsPlot branch:* `col`, `lty`, `type`, `peakCol`, `peakBg`,
+`peakPch` — lcmsPlot uses its own per-sample colour scale.
+
+## `plotChromPeakDensity()`
+
+```{r xchr-density-base}
+pdp1 <- PeakDensityParam(sampleGroups = rep(1, ncol(xchr1)))
+plotChromPeakDensity(xchr1, param = pdp1)
+```
+
+```{r xchr-density-lcms, eval = has_lcmsplot}
+plotChromPeakDensity(xchr1, param = pdp1, backend = "lcmsPlot")
+```
+
+Both backends stack the EICs above the peak-density panel, in which each
+chromatographic peak is a point positioned by its sample. `bw`, `minFraction`,
+`minSamples` and `sampleGroups` are taken from `param`, and `simulate` behaves
+as it does on the base backend: `simulate = TRUE` derives the feature groups
+the parameters *would* produce, `simulate = FALSE` draws the feature
+definitions already stored on the object.
+
+As with the base method, `object` has to be a single row.
+
+## `plotChromatogramsOverlay()`
+
+```{r xchrs-overlay-base}
+plotChromatogramsOverlay(xchrs, col = c("#c0392b", "#2471a3"))
+```
+
+```{r xchrs-overlay-lcms, eval = has_lcmsplot}
+plotChromatogramsOverlay(xchrs, backend = "lcmsPlot")
+```
+
+One panel per sample, with the EICs overlaid inside it. The base method
+identifies the EICs through `col`, which is recycled across them if only one
+colour is given — hence the explicit pair above, without which both traces are
+the same grey. lcmsPlot assigns the colours itself, from the m/z window of each
+EIC.
+
+Only `XChromatograms` is supported: lcmsPlot derives the per-EIC identifiers
+that the overlay colours and orders by from the m/z windows of an
+`XChromatograms`, which a plain `MChromatograms` does not carry.
+
+# Legacy xcmsRaw methods
+
+## `plotTIC()`
+
+```{r tic-base}
+plotTIC(xraw)
+```
+
+```{r tic-lcms, eval = has_lcmsplot}
+plotTIC(xraw, backend = "lcmsPlot")
+```
+
+*Dropped:* `ident`, `msident` (interactive identification).
+
+## `plotEIC()`
+
+```{r eic-base}
+plotEIC(xraw, mzrange = c(334.9, 335.1), rtrange = c(2700, 2900))
+```
+
+```{r eic-lcms, eval = has_lcmsplot}
+plotEIC(xraw, mzrange = c(334.9, 335.1), rtrange = c(2700, 2900),
+        backend = "lcmsPlot")
+```
+
+*Dropped:* `add` (overlay), `scanrange`, `type`.
+
+## `plotChrom()`
+
+```{r chrom-base}
+plotChrom(xraw, base = TRUE)
+```
+
+```{r chrom-lcms, eval = has_lcmsplot}
+plotChrom(xraw, base = TRUE, backend = "lcmsPlot")
+```
+
+`base` selects the aggregation on both backends: `base = TRUE` gives the base
+peak chromatogram (`aggregation_fun = "max"`) and `base = FALSE` the averaged
+ion chromatogram (`aggregation_fun = "mean"`).
+
+```{r chrom-base-false}
+plotChrom(xraw, base = FALSE)
+```
+
+```{r chrom-base-false-lcms, eval = has_lcmsplot}
+plotChrom(xraw, base = FALSE, backend = "lcmsPlot")
+```
+
+The mean is taken over the profile matrix, so scans with no signal in a mass
+bin contribute zeros and the two traces agree exactly — provided the object was
+read with a non-zero `profstep`. For file-backed inputs without a profile
+matrix lcmsPlot averages over the measured peaks of each scan instead, which
+sits higher.
+
+## `plotScan()`
+
+```{r scan-base}
+plotScan(xraw, scan = 500)
+```
+
+```{r scan-lcms, eval = has_lcmsplot}
+plotScan(xraw, scan = 500, backend = "lcmsPlot")
+```
+
+*Dropped:* `ident`.
+
+## `plotSpec()`
+
+```{r spec-base}
+plotSpec(xraw)
+```
+
+`plotSpec()` averages the profile matrix across every scan in the selected
+range. `lcmsPlot::lp_spectra()` extracts single scans only, so there is no
+lcmsPlot equivalent and this method has no `backend` argument; passing one is
+an error rather than a silently ignored argument.
+
+For a single scan use `plotScan()`, which does have an lcmsPlot backend.
+
+## `plotRaw()`
+
+```{r raw-base}
+plotRaw(xraw, mzrange = c(300, 350), rtrange = c(2700, 2900))
+```
+
+```{r raw-lcms, eval = has_lcmsplot}
+plotRaw(xraw, mzrange = c(300, 350), rtrange = c(2700, 2900),
+        backend = "lcmsPlot")
+```
+
+Both panels are a scatter of the individual centroids;
+`lcmsPlot::lp_intensity_map(geom = "point")` skips the binning so gaps in the
+mass traces stay visible. *Dropped:* `log`, `title` and `scanrange` — lcmsPlot
+always maps intensity on a log scale.
+
+## `levelplot()`
+
+```{r lvl-base}
+levelplot(xraw)
+```
+
+```{r lvl-lcms, eval = has_lcmsplot}
+levelplot(xraw, backend = "lcmsPlot")
+```
+
+Both render a 2D intensity surface over the same m/z (x) and retention time (y)
+axes, and `col.regions` is honoured as the lcmsPlot fill scale. The remaining
+difference is a data model rather than a style: the *lattice* version draws the
+gridded profile matrix, which has a value in every cell, so its baseline is
+filled; lcmsPlot draws only the measured centroids, leaving the baseline blank
+and the mass traces reading as separate lines. *Dropped:* `log` — lcmsPlot
+always maps intensity on a log scale.
+
+# Methods without an lcmsPlot equivalent
+
+| Method | Why no lcmsPlot path | Workaround |
+|---|---|---|
+| `plotSpec,xcmsRaw` | `lp_spectra()` extracts single scans; it has no cross-scan averaging | Use the base backend, or `plotScan(x, scan, backend = "lcmsPlot")` for one scan |
+| `plotPrecursorIons,MsExperiment` | No lcmsPlot layer plots precursor m/z against retention time | Use the base backend |
+| `plotPeaks,xcmsRaw` | Consumes a `findPeaks(xcmsRaw)` matrix | Pass the peak matrix to `lcmsPlot::lp_chromatogram(features = )` and facet by `feature_id`, or migrate to `XcmsExperiment` (`findChromPeaks`) |
+| `plotSurf,xcmsRaw` | 3D `rgl` surface; lcmsPlot is `ggplot2`-only | Use the base backend (requires `rgl`) |
+| `image,xcmsRaw` | Redundant with `levelplot()`, and out of scope of the integration | Use the base backend, or `levelplot(x, backend = "lcmsPlot")` |
+
+# Customising the lcmsPlot output
+
+The lcmsPlot branches return the `patchwork`/`ggplot` object invisibly, so
+you can style it after the fact:
+
+```{r customise, eval = has_lcmsplot, fig.width = 8, fig.height = 4}
+library(ggplot2)
+library(patchwork)
+
+p <- plotEIC(xraw, mzrange = c(334.9, 335.1), rtrange = c(2700, 2900),
+             backend = "lcmsPlot")
+
+p &
+    theme_minimal(base_size = 11) &
+    labs(title = "EIC m/z 335 - ko15")
+```
+
+To save the figure use `ggplot2::ggsave()` (or `patchwork::wrap_plots()` →
+`ggsave()`):
+
+```{r save, eval = FALSE}
+ggsave("eic_ko15.pdf", p, width = 8, height = 4)
+```
+
+This is post-processing: the `backend` argument gives you no way to reach inside
+the figure while it is being built. When you need that (e.g., a different title, a
+legend somewhere else, panels arranged another way) build the plot from
+lcmsPlot layers instead, as in *Composing figures* above.
+
+# Session information
+
+```{r sessioninfo}
+sessionInfo()
+```

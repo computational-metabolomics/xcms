@@ -35,12 +35,43 @@ test_that("plotAdjustedRtime,XcmsExperiment works", {
     plotAdjustedRtime(xmsegr, adjustedRtime = FALSE)
 })
 
+test_that("plotAdjustedRtime,XcmsExperiment lcmsPlot backend works", {
+    skip_if_not_installed("lcmsPlot")
+    res <- plotAdjustedRtime(xmsegr, backend = "lcmsPlot")
+    expect_true(inherits(res, c("ggplot", "patchwork")))
+})
+
 test_that("plotChromPeaks,XcmsExperiment works", {
     expect_true(plotChromPeaks(xmse, 2))
 })
 
+test_that("plotChromPeaks,XcmsExperiment lcmsPlot backend works", {
+    skip_if_not_installed("lcmsPlot")
+    res <- plotChromPeaks(xmse, file = 1, backend = "lcmsPlot")
+    expect_true(inherits(res, c("ggplot", "patchwork")))
+})
+
 test_that("plotChromPeakImage,XcmsExperiment works", {
     expect_true(plotChromPeakImage(xmse))
+})
+
+test_that("plotChromPeakImage,XcmsExperiment lcmsPlot backend works", {
+    skip_if_not_installed("lcmsPlot")
+    res <- plotChromPeakImage(xmse, backend = "lcmsPlot")
+    expect_true(inherits(res, c("ggplot", "patchwork")))
+    res_log <- plotChromPeakImage(xmse, binSize = 60, log = TRUE,
+                                  backend = "lcmsPlot")
+    expect_true(inherits(res_log, c("ggplot", "patchwork")))
+    ## The peak counts have to agree with the binning of the base method.
+    xl <- c(floor(min(rtime(xmse))), ceiling(max(rtime(xmse))))
+    brks <- seq(xl[1], xl[2], by = 30)
+    if (brks[length(brks)] < xl[2])
+        brks <- c(brks, brks[length(brks)] + 30)
+    pks <- chromPeaks(xmse, rt = xl, msLevel = 1L)
+    n_base <- sum(hist(pks[pks[, "sample"] == 1, "rt"], breaks = brks,
+                       plot = FALSE)$counts)
+    n_lcms <- sum(res$data$n_peaks[res$data$metadata_index == 1])
+    expect_equal(n_lcms, n_base)
 })
 
 test_that("plot,XcmsExperiment and .xmse_plot_xic works", {
@@ -52,6 +83,13 @@ test_that("plot,XcmsExperiment and .xmse_plot_xic works", {
 
     tmp <- filterMz(filterRt(xmse, rt = c(2550, 2800)), mz = c(342.5, 344.5))
     plot(tmp)
+})
+
+test_that("plot,XcmsExperiment lcmsPlot backend works", {
+    skip_if_not_installed("lcmsPlot")
+    tmp <- filterMz(filterRt(mse, rt = c(2550, 2800)), mz = c(342.5, 344.5))
+    res <- plot(tmp, backend = "lcmsPlot")
+    expect_true(inherits(res, c("ggplot", "patchwork")))
 })
 
 test_that("plotPrecursorIons works", {

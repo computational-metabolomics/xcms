@@ -17,6 +17,7 @@ plotChromPeaks(
   ylab = "mz",
   main = NULL,
   msLevel = 1L,
+  backend = c("base", "lcmsPlot"),
   ...
 )
 
@@ -29,6 +30,7 @@ plotChromPeakImage(
   yaxt = par("yaxt"),
   main = "Chromatographic peak counts",
   msLevel = 1L,
+  backend = c("base", "lcmsPlot"),
   ...
 )
 }
@@ -66,6 +68,17 @@ y-axis label.}
 
 \item{msLevel}{\code{integer(1)} defining the MS level from which the peaks
 should be visualized.}
+
+\item{backend}{\code{character(1)} defining the plotting backend. The default
+\code{backend = "base"} uses base R graphics. With \code{backend = "lcmsPlot"}
+the plot is generated with the (suggested) \emph{lcmsPlot} package and the
+function returns the \emph{ggplot2}-based figure invisibly.
+\code{plotChromPeaks} combines \code{lcmsPlot::lp_intensity_map()} with
+\code{lcmsPlot::lp_chrom_peak_rects()}, so the peak rectangles are drawn on
+top of the m/z-retention time intensity map rather than on an empty
+plot; \code{add} and \code{msLevel} are ignored. \code{plotChromPeakImage} uses
+\code{lcmsPlot::lp_peak_count_image()}, which honors \code{binSize}, \code{log} and
+\code{xlim} but not \code{yaxt}.}
 
 \item{...}{Additional arguments passed to the \code{plot} (for
 \code{plotChromPeaks}) and \code{image} (for
@@ -115,6 +128,13 @@ plotChromPeaks(faahko_sub)
 ## Plot all detected peaks from the second file and restrict the plot to a
 ## mz-rt slice
 plotChromPeaks(faahko_sub, file = 2, xlim = c(3500, 3600), ylim = c(400, 600))
+
+## Alternatively, generate the same visualizations with the 'lcmsPlot'
+## package (if installed).
+if (requireNamespace("lcmsPlot", quietly = TRUE)) {
+    plotChromPeaks(faahko_sub, backend = "lcmsPlot")
+    plotChromPeakImage(faahko_sub, backend = "lcmsPlot")
+}
 }
 \author{
 Johannes Rainer

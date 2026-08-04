@@ -17,6 +17,7 @@ plotAdjustedRtime(
   peakGroupsPch = 16,
   peakGroupsLty = 3,
   ylim,
+  backend = c("base", "lcmsPlot"),
   ...
 )
 }
@@ -54,6 +55,13 @@ each peak groups (only if alignment was performed using the
 \item{ylim}{optional \code{numeric(2)} with the upper and lower limits on
 the y-axis.b}
 
+\item{backend}{\code{character(1)} defining the plotting backend. The default
+\code{backend = "base"} uses base R graphics. With \code{backend = "lcmsPlot"}
+the plot is generated with the (suggested) \emph{lcmsPlot} package
+(\code{lcmsPlot::lp_rt_diff_plot()}), producing a \emph{ggplot2}-based figure;
+in that case the function returns the plot object invisibly and most
+of the base-graphics styling arguments are ignored.}
+
 \item{...}{Additional arguments to be passed down to the \code{plot}
 function.}
 }
@@ -85,6 +93,11 @@ res <- adjustRtime(res, param = fgp)
 ## Visualize the impact of the alignment.
 plotAdjustedRtime(res, adjusted = FALSE)
 grid()
+
+## Alternatively, generate the same visualization with the 'lcmsPlot'
+## package (if installed).
+if (requireNamespace("lcmsPlot", quietly = TRUE))
+    plotAdjustedRtime(res, backend = "lcmsPlot")
 }
 \author{
 Johannes Rainer

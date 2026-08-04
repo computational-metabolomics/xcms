@@ -89,7 +89,14 @@ filterFeatureDefinitions(object, ...)
   BPPARAM = bpparam()
 )
 
-\S4method{plot}{MsExperiment,missing}(x, y, msLevel = 1L, peakCol = "#ff000060", ...)
+\S4method{plot}{MsExperiment,missing}(
+  x,
+  y,
+  msLevel = 1L,
+  peakCol = "#ff000060",
+  backend = c("base", "lcmsPlot"),
+  ...
+)
 
 \method{c}{XcmsExperiment}(...)
 
@@ -278,7 +285,7 @@ type of the returned object. Currently only
 \code{return.type = "MChromatograms"} is supported.}
 
 \item{BPPARAM}{For \code{chromatogram()}: parallel processing setup. Defaults
-to \code{BPPARAM = bpparam()}. See \code{\link[BiocParallel:register]{BiocParallel::bpparam()}} for more
+to \code{BPPARAM = bpparam()}. See \code{\link[BiocParallel:bpparam]{BiocParallel::bpparam()}} for more
 information.}
 
 \item{x}{An \code{XcmsExperiment} object.}
@@ -288,6 +295,14 @@ information.}
 \item{peakCol}{For \code{plot()}: defines the border color of the rectangles
 indicating the identified chromatographic peaks. Only a single color
 is supported. Defaults to `peakCol = "#ff000060".}
+
+\item{backend}{For \code{plot()}, \code{plotAdjustedRtime()}, \code{plotChromPeaks()} and
+\code{plotChromPeakImage()}: \code{character(1)} defining the plotting backend.
+The default \code{backend = "base"} uses base R graphics. With
+\code{backend = "lcmsPlot"} the plot is generated with the (suggested)
+\emph{lcmsPlot} package (version 1.1.8 or later), producing a
+\emph{ggplot2}-based figure that is returned invisibly. Base-graphics
+styling arguments are ignored in that case.}
 
 \item{i}{For \code{[}: \code{integer} or \code{logical} defining the samples/files to
 subset.}
@@ -535,7 +550,7 @@ extract the data from (to e.g. for extracted ion chromatograms EICs).
 Both parameters are expected to be numerical two-column matrices with
 the first column defining the lower and the second the upper margin.
 Each row can define a separate m/z - retention time region. Currently
-the function returns a \code{\link[MSnbase:MChromatograms-class]{MSnbase::MChromatograms()}} object for \code{object}
+the function returns a \code{\link[MSnbase:MChromatograms]{MSnbase::MChromatograms()}} object for \code{object}
 being a \code{MsExperiment} or, for \code{object} being an \code{XcmsExperiment},
 either a \code{MChromatograms} or \code{\link[=XChromatograms]{XChromatograms()}} depending on parameter
 \code{return.type} (can be either \code{"MChromatograms"} or \code{"XChromatograms"}).
@@ -719,7 +734,7 @@ to define the column in \code{chromPeaks} that should be selected; defaults to
 \verb{intensity = "into"). }method = "sum"`: sum the values for all
 chromatographic peaks assigned to the feature in the same sample.
 \item \code{quantify()}: extract the correspondence analysis results as a
-\code{\link[SummarizedExperiment:SummarizedExperiment-class]{SummarizedExperiment::SummarizedExperiment()}}. The feature \emph{values}
+\code{\link[SummarizedExperiment:SummarizedExperiment]{SummarizedExperiment::SummarizedExperiment()}}. The feature \emph{values}
 are used as \code{assay} in the returned \code{SummarizedExperiment}, \code{rowData}
 contains the \code{featureDefinitions} (without column \code{"peakidx"}) and
 \code{colData} the \code{sampleData} of \code{object}. Additional parameters to the
@@ -739,7 +754,11 @@ interest). Parameter \code{msLevel} allows to define from which MS level the
 plot should be created. If \code{x} is a \code{XcmsExperiment} with available
 identified chromatographic peaks, also the region defining the peaks
 are indicated with a rectangle. Parameter \code{peakCol} allows to define the
-color of the border for these rectangles.
+color of the border for these rectangles. With \code{backend = "lcmsPlot"} the
+plot is instead generated with the (suggested) \emph{lcmsPlot} package as a
+\emph{ggplot2}-based m/z - retention time intensity map, with the identified
+chromatographic peaks overlaid as rectangles in the \code{peakCol} color; the
+plot object is returned invisibly.
 \item \code{plotAdjustedRtime()}: plot the alignment results; see
 \code{\link[=plotAdjustedRtime]{plotAdjustedRtime()}} for more information.
 \item \code{plotChromPeakImage()}: show the \emph{density} of identified chromatographic

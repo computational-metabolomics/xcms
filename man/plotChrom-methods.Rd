@@ -12,7 +12,8 @@
 \describe{
 \item{object = "xcmsRaw"}{
   \code{plotChrom(object, base = FALSE, ident = FALSE,
-                  fitgauss = FALSE, vline = numeric(0), ...)}
+                  fitgauss = FALSE, vline = numeric(0),
+                  backend = c("base", "lcmsPlot"), ...)}
 }
 }}
 \arguments{
@@ -21,6 +22,17 @@
   \item{ident}{logical, use mouse to identify and label peaks}
   \item{fitgauss}{logical, fit a gaussian to the largest peak}
   \item{vline}{numeric vector with locations of vertical lines}
+  \item{backend}{\code{character(1)} defining the plotting backend. The
+    default \code{backend = "base"} uses base R graphics. With
+    \code{backend = "lcmsPlot"} the plot is generated with the (suggested)
+    \emph{lcmsPlot} package and returned invisibly. \code{base} selects the
+    aggregation: \code{base = TRUE} maps onto
+    \code{lp_chromatogram(aggregation_fun = "max")} (base peak chromatogram)
+    and \code{base = FALSE} onto \code{aggregation_fun = "mean"} (averaged ion
+    chromatogram). The mean is taken over the profile matrix, so it matches the
+    base-graphics trace for objects read with a non-zero \code{profstep}.
+    \code{ident}, \code{fitgauss} and \code{vline} are ignored on the lcmsPlot
+    branch. Requires \emph{lcmsPlot} 1.1.8 or later.}
   \item{...}{arguments passed to \code{\link{profRange}}}
 }
 \value{

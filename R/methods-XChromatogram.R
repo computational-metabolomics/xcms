@@ -305,6 +305,21 @@ setReplaceMethod("chromPeaks", "XChromatogram", function(object, value) {
 #'     data and the provided [PeakDensityParam()] `param` argument. See
 #'     section *Correspondence analysis* for details.
 #'
+#' @param backend For `plot`, `plotChromPeakDensity` and
+#'     `plotChromatogramsOverlay`: `character(1)` defining the plotting
+#'     backend. The default `backend = "base"` uses base R graphics. With
+#'     `backend = "lcmsPlot"` the plot is generated with the (suggested)
+#'     *lcmsPlot* package and returned invisibly as a *ggplot2* figure.
+#'     `plot` maps `peakType` onto
+#'     `lcmsPlot::lp_chromatogram(highlight_peaks_mode = )`;
+#'     `plotChromPeakDensity` combines that with
+#'     `lcmsPlot::lp_peak_density()`, taking `bw`, `minFraction`, `minSamples`
+#'     and `sampleGroups` from `param` and honoring `simulate`;
+#'     `plotChromatogramsOverlay` passes `stacked` and `transform` through to
+#'     `lcmsPlot::lp_chromatogram()`. Base-graphics styling arguments (`col`,
+#'     `lty`, `type`, `peakCol`, `peakBg`, `peakPch`) are ignored, as lcmsPlot
+#'     applies its own colour scale.
+#'
 #' @param ... For `filterChromPeaks`: additional parameters defining how to
 #'     filter chromatographic peaks. See function description below for details.
 #'
@@ -341,8 +356,22 @@ setMethod("plot", "XChromatogram", function(x, col = "#00000060", lty = 1,
                                                          "none"),
                                             peakCol = "#00000060",
                                             peakBg = "#00000020",
-                                            peakPch = 1, ...) {
+                                            peakPch = 1,
+                                            backend = c("base", "lcmsPlot"),
+                                            ...) {
     peakType <- match.arg(peakType)
+    backend <- match.arg(backend)
+    if (backend == "lcmsPlot") {
+        .xmse_require_lcmsplot()
+        layer <- if (peakType == "none")
+            lcmsPlot::lp_chromatogram(highlight_peaks = FALSE)
+        else
+            lcmsPlot::lp_chromatogram(highlight_peaks = TRUE,
+                                      highlight_peaks_mode = peakType)
+        p <- lcmsPlot::lcmsPlot(x) + layer + lcmsPlot::lp_get_plot()
+        print(p)
+        return(invisible(p))
+    }
     callNextMethod(x = x, col = col, lty = lty, type = type, xlab = xlab,
                    ylab = ylab, main = main, ...)
     pks <- chromPeaks(x)

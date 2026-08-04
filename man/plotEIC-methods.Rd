@@ -11,7 +11,8 @@
 \item{object = "xcmsRaw"}{
   \code{
     plotEIC(object, mzrange = numeric(), rtrange = numeric(),
-    scanrange = numeric(), mzdec=2, type="l", add=FALSE, ...)
+    scanrange = numeric(), mzdec=2, type="l", add=FALSE,
+    backend = c("base", "lcmsPlot"), ...)
   }
 }
 }}
@@ -35,6 +36,13 @@
   \item{add}{
     If the EIC should be added to an existing plot.
   }
+  \item{backend}{\code{character(1)} defining the plotting backend. The
+    default \code{backend = "base"} uses base R graphics. With
+    \code{backend = "lcmsPlot"} the plot is generated with the (suggested)
+    \emph{lcmsPlot} package, passing \code{mzrange} and \code{rtrange} to
+    \code{lp_chromatogram(features = )}, and the \emph{ggplot2}-based plot
+    object is returned invisibly. \code{scanrange}, \code{mzdec},
+    \code{type} and \code{add} are ignored on the lcmsPlot branch.}
   \item{...}{
     Additional parameters passed to the plotting function
     (e.g. \code{col} etc).

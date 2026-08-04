@@ -172,9 +172,26 @@ setMethod("plot", "XChromatograms", function(x, col = "#00000060", lty = 1,
                                                           "none"),
                                              peakCol = "#00000060",
                                              peakBg = "#00000020",
-                                             peakPch = 1, ...) {
+                                             peakPch = 1,
+                                             backend = c("base", "lcmsPlot"),
+                                             ...) {
     peakType <- match.arg(peakType)
+    backend <- match.arg(backend)
     nr <- nrow(x)
+    if (backend == "lcmsPlot") {
+        .xmse_require_lcmsplot()
+        layer <- if (peakType == "none")
+            lcmsPlot::lp_chromatogram(highlight_peaks = FALSE)
+        else
+            lcmsPlot::lp_chromatogram(highlight_peaks = TRUE,
+                                      highlight_peaks_mode = peakType)
+        facets <- if (nr > 1) "feature_id" else "sample_id"
+        p <- lcmsPlot::lcmsPlot(x) + layer +
+            lcmsPlot::lp_facets(facets = facets) +
+            lcmsPlot::lp_get_plot()
+        print(p)
+        return(invisible(p))
+    }
     if (nr > 1)
         par(mfrow = c(round(sqrt(nr)), ceiling(sqrt(nr))))
     pks_all <- chromPeaks(x)
@@ -503,8 +520,10 @@ setMethod("plotChromPeakDensity", "XChromatograms",
           function(object, param, col = "#00000060", xlab = "retention time",
                    main = NULL, peakType = c("polygon", "point", "rectangle",
                                              "none"), peakCol = "#00000060",
-                   peakBg = "#00000020", peakPch = 1, simulate = TRUE, ...) {
+                   peakBg = "#00000020", peakPch = 1, simulate = TRUE,
+                   backend = c("base", "lcmsPlot"), ...) {
               peakType <- match.arg(peakType)
+              backend <- match.arg(backend)
               if (!any(hasChromPeaks(object)))
                   stop("No chromatographic peaks present. Please run ",
                        "'findChromPeaks' first.", call. = FALSE)
@@ -527,6 +546,25 @@ setMethod("plotChromPeakDensity", "XChromatograms",
               }
               if (!length(param))
                   stop("Object 'param' is missing", call. = FALSE)
+              if (backend == "lcmsPlot") {
+                  .xmse_require_lcmsplot()
+                  layer <- if (peakType == "none")
+                      lcmsPlot::lp_chromatogram(highlight_peaks = FALSE)
+                  else
+                      lcmsPlot::lp_chromatogram(
+                          highlight_peaks = TRUE,
+                          highlight_peaks_mode = peakType)
+                  p <- lcmsPlot::lcmsPlot(object) + layer +
+                      lcmsPlot::lp_peak_density(
+                          bw = param@bw,
+                          min_fraction = param@minFraction,
+                          min_samples = param@minSamples,
+                          sample_groups = param@sampleGroups,
+                          simulate = simulate) +
+                      lcmsPlot::lp_get_plot()
+                  print(p)
+                  return(invisible(p))
+              }
               fts <- NULL
               if (!simulate && hasFeatures(object))
                   fts <- featureDefinitions(object)

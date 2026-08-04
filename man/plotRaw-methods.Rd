@@ -13,7 +13,8 @@
 \describe{
 \item{object = "xcmsRaw"}{
   \code{plotRaw(object, mzrange = numeric(), rtrange = numeric(),
-                scanrange = numeric(), log=FALSE, title='Raw Data')}
+                scanrange = numeric(), log=FALSE, title='Raw Data',
+                backend = c("base", "lcmsPlot"))}
 }
 }}
 \arguments{
@@ -36,6 +37,15 @@
   \item{title}{
     main title of the plot
   }
+  \item{backend}{\code{character(1)} defining the plotting backend. The
+    default \code{backend = "base"} draws the classical raw-data scatter.
+    With \code{backend = "lcmsPlot"} the plot is generated with the
+    (suggested) \emph{lcmsPlot} package
+    (\code{lp_intensity_map(geom = "point")}), which draws the same scatter of
+    individual centroids as a \emph{ggplot2} figure and returns the plot object
+    invisibly. \code{log}, \code{title} and \code{scanrange} are ignored on the
+    lcmsPlot branch, and intensity is always mapped on a log scale. Requires
+    \emph{lcmsPlot} 1.1.8 or later.}
 }
 \value{
   A matrix with the points plotted.

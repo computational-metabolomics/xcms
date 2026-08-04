@@ -183,6 +183,56 @@ test_that("plot,XChromatogram works", {
     plot(xchr)
 })
 
+test_that("plot,XChromatograms lcmsPlot backend works", {
+    skip_on_os(os = "windows", arch = "i386")
+    skip_if_not_installed("lcmsPlot")
+    mzr <- matrix(c(335, 335, 344, 344), ncol = 2, byrow = TRUE)
+    xchr_rt <- chromatogram(xod_chr, mz = mzr)
+    res <- plot(xchr_rt, backend = "lcmsPlot")
+    expect_true(inherits(res, c("ggplot", "patchwork")))
+    res_one <- plot(xchr_rt[1, , drop = FALSE], backend = "lcmsPlot")
+    expect_true(inherits(res_one, c("ggplot", "patchwork")))
+    res_none <- plot(xchr_rt, backend = "lcmsPlot", peakType = "none")
+    expect_true(inherits(res_none, c("ggplot", "patchwork")))
+})
+
+test_that("plotChromPeakDensity,XChromatograms lcmsPlot backend works", {
+    skip_on_os(os = "windows", arch = "i386")
+    skip_if_not_installed("lcmsPlot")
+    mzr <- matrix(c(335, 335), ncol = 2, byrow = TRUE)
+    xchr <- chromatogram(xod_chr, mz = mzr)
+    p <- PeakDensityParam(sampleGroups = rep(1, ncol(xchr)))
+    res <- plotChromPeakDensity(xchr, param = p, backend = "lcmsPlot")
+    expect_true(inherits(res, c("ggplot", "patchwork")))
+    res_none <- plotChromPeakDensity(xchr, param = p, peakType = "none",
+                                     backend = "lcmsPlot")
+    expect_true(inherits(res_none, c("ggplot", "patchwork")))
+    ## The single-row restriction of the base method still applies.
+    mzr2 <- matrix(c(335, 335, 344, 344), ncol = 2, byrow = TRUE)
+    expect_error(
+        plotChromPeakDensity(chromatogram(xod_chr, mz = mzr2), param = p,
+                             backend = "lcmsPlot"),
+        "single chromatogram")
+})
+
+test_that("plotChromatogramsOverlay,XChromatograms lcmsPlot backend works", {
+    skip_on_os(os = "windows", arch = "i386")
+    skip_if_not_installed("lcmsPlot")
+    mzr <- matrix(c(335, 335, 344, 344), ncol = 2, byrow = TRUE)
+    xchr <- chromatogram(xod_chr, mz = mzr)
+    res <- plotChromatogramsOverlay(xchr, backend = "lcmsPlot")
+    expect_true(inherits(res, c("ggplot", "patchwork")))
+    res_st <- plotChromatogramsOverlay(xchr, stacked = 0.6,
+                                       backend = "lcmsPlot")
+    expect_true(inherits(res_st, c("ggplot", "patchwork")))
+    res_tr <- plotChromatogramsOverlay(xchr, transform = log10,
+                                       backend = "lcmsPlot")
+    expect_true(inherits(res_tr, c("ggplot", "patchwork")))
+    ## 'stacked' offsets the individual EICs; lcmsPlot reports the offsets it
+    ## used on the returned plot.
+    expect_true(!is.null(attr(res_st, "stacked_offsets")))
+})
+
 test_that("processHistory,XChromatograms works", {
     skip_on_os(os = "windows", arch = "i386")
 

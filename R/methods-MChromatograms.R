@@ -346,6 +346,17 @@ setMethod("filterColumnsKeepTop", "MChromatograms",
 #' @param type `character(1)` defing the type of the plot. By default
 #'     (`type = "l"`) each chromatogram is drawn as a line.
 #'
+#' @param backend if `object` is a `XChromatograms` object: `character(1)`
+#'     defining the plotting backend. The default `backend = "base"` uses base
+#'     R graphics. With `backend = "lcmsPlot"` the plot is generated with the
+#'     (suggested) *lcmsPlot* package and returned invisibly as a *ggplot2*
+#'     figure; `stacked` and `transform` are passed through to
+#'     `lcmsPlot::lp_chromatogram()`, the EICs are coloured by feature and the
+#'     panels faceted by sample. Base-graphics styling arguments are ignored.
+#'     Only available for `XChromatograms`: lcmsPlot derives the per-EIC
+#'     identifiers the overlay needs from the m/z windows of an
+#'     `XChromatograms`, which a plain `MChromatograms` does not carry.
+#'
 #' @param xlab `character(1)` defining the x-axis label.
 #'
 #' @param xlim optional `numeric(2)` defining the x-axis limits.
@@ -432,6 +443,12 @@ setMethod("plotChromatogramsOverlay", "MChromatograms",
                    ylim = numeric(), stacked = 0, transform = identity, ...) {
               nsam <- ncol(object)
               transform <- match.fun(transform)
+              ## '...' would otherwise absorb 'backend' and quietly draw the
+              ## base plot; only the XChromatograms method supports lcmsPlot.
+              if ("backend" %in% ...names())
+                  stop("'backend' is only supported for 'XChromatograms' ",
+                       "objects; lcmsPlot needs the per-EIC m/z windows that ",
+                       "a 'MChromatograms' does not carry.", call. = FALSE)
               if (nsam > 1)
                   par(mfrow = n2mfrow(nsam, 1))
               res <- vector("list", nsam)
@@ -452,10 +469,15 @@ setMethod("plotChromatogramsOverlay", "XChromatograms",
                    ylim = numeric(), peakType = c("polygon", "point",
                                                   "rectangle", "none"),
                    peakBg = NULL, peakCol = NULL, peakPch = 1,
-                   stacked = 0, transform = identity, ...) {
+                   stacked = 0, transform = identity,
+                   backend = c("base", "lcmsPlot"), ...) {
               transform <- match.fun(transform)
               nsam <- ncol(object)
               peakType <- match.arg(peakType)
+              if (match.arg(backend) == "lcmsPlot")
+                  return(.xchromatograms_overlay_lcmsplot(
+                      object, stacked = stacked, transform = transform,
+                      peakType = peakType))
               if (nsam > 1)
                   par(mfrow = n2mfrow(nsam, 1))
               res <- vector("list", nsam)
@@ -469,6 +491,43 @@ setMethod("plotChromatogramsOverlay", "XChromatograms",
               }
               invisible(res)
           })
+
+#' `backend = "lcmsPlot"` branch of `plotChromatogramsOverlay,XChromatograms`.
+#'
+#' One panel per sample with the EICs overlaid inside it, which is the layout
+#' the base method builds with `par(mfrow = )`. Colouring by `feature_id` is
+#' what makes `stacked` offset the individual EICs rather than the samples.
+#' `highlight_peaks_factor` is deliberately left at its default: lcmsPlot builds
+#' the peak ribbons per sample, so keying their colour on the feature makes the
+#' colour vary within a ribbon, which ggplot2 rejects.
+#'
+#' Only `XChromatograms` is supported. lcmsPlot derives `feature_id` and
+#' `feature_mz` from the m/z windows of an `XChromatograms`; a plain
+#' `MChromatograms` carries neither, so there is nothing to colour or order the
+#' offsets by.
+#'
+#' @noRd
+.xchromatograms_overlay_lcmsplot <- function(object, stacked = 0,
+                                             transform = identity,
+                                             peakType = "none") {
+    .xmse_require_lcmsplot()
+    layer <- if (peakType == "none")
+        lcmsPlot::lp_chromatogram(highlight_peaks = FALSE, stacked = stacked,
+                                  transform = transform)
+    else
+        lcmsPlot::lp_chromatogram(highlight_peaks = TRUE,
+                                  highlight_peaks_mode = peakType,
+                                  stacked = stacked, transform = transform)
+    p <- lcmsPlot::lcmsPlot(object) + layer +
+        lcmsPlot::lp_arrange(group_by = "feature_id") +
+        lcmsPlot::lp_facets(facets = "sample_id") +
+        ## The base method identifies the EICs by 'col' alone and draws no
+        ## legend; suppress lcmsPlot's so the two outputs are comparable.
+        lcmsPlot::lp_legend(position = "none") +
+        lcmsPlot::lp_get_plot()
+    print(p)
+    invisible(p)
+}
 
 .plot_single_xchromatograms <- function(x, type = "l", col = "#00000060",
                                         peakType = c("polygon", "point",

@@ -35,11 +35,12 @@
   peakPch = 1,
   stacked = 0,
   transform = identity,
+  backend = c("base", "lcmsPlot"),
   ...
 )
 }
 \arguments{
-\item{object}{\code{\link[MSnbase:MChromatograms-class]{MSnbase::MChromatograms()}} or \code{\link[=XChromatograms]{XChromatograms()}} object.}
+\item{object}{\code{\link[MSnbase:MChromatograms]{MSnbase::MChromatograms()}} or \code{\link[=XChromatograms]{XChromatograms()}} object.}
 
 \item{col}{definition of the color in which the chromatograms should be
 drawn. Can be of length 1 or equal to \code{nrow(object)} to plot each
@@ -93,6 +94,17 @@ be drawn in the color defined by \code{col}.}
 \item{peakPch}{if \code{object} is a \code{XChromatograms} object: \emph{point character} to
 be used to label the apex position of the chromatographic peak if
 \code{peakType = "point"}.}
+
+\item{backend}{if \code{object} is a \code{XChromatograms} object: \code{character(1)}
+defining the plotting backend. The default \code{backend = "base"} uses base
+R graphics. With \code{backend = "lcmsPlot"} the plot is generated with the
+(suggested) \emph{lcmsPlot} package and returned invisibly as a \emph{ggplot2}
+figure; \code{stacked} and \code{transform} are passed through to
+\code{lcmsPlot::lp_chromatogram()}, the EICs are coloured by feature and the
+panels faceted by sample. Base-graphics styling arguments are ignored.
+Only available for \code{XChromatograms}: lcmsPlot derives the per-EIC
+identifiers the overlay needs from the m/z windows of an
+\code{XChromatograms}, which a plain \code{MChromatograms} does not carry.}
 }
 \value{
 silently returns a \code{list} (length equal to \code{ncol(object)} of
@@ -103,7 +115,7 @@ each EIC.
 \code{plotOverlay} draws chromatographic peak data from multiple (different)
 extracted ion chromatograms (EICs) into the same plot. This allows to
 directly compare the peak shape of these EICs in the same sample. In
-contrast to the \code{plot} function for \code{\link[MSnbase:MChromatograms-class]{MSnbase::MChromatograms()}} object,
+contrast to the \code{plot} function for \code{\link[MSnbase:MChromatograms]{MSnbase::MChromatograms()}} object,
 which draws the data from the same EIC across multiple samples in the
 same plot, this function draws the different EICs from the same sample
 into the same plot.

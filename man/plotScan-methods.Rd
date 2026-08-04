@@ -11,7 +11,8 @@
 \section{Methods}{
 \describe{
 \item{object = "xcmsRaw"}{
-  \code{plotScan(object, scan, mzrange = numeric(), ident = FALSE)}
+  \code{plotScan(object, scan, mzrange = numeric(), ident = FALSE,
+                 backend = c("base", "lcmsPlot"))}
 }
 }}
 \arguments{
@@ -27,6 +28,13 @@
     logical, use mouse to interactively identify and label individual
     masses
   }
+  \item{backend}{\code{character(1)} defining the plotting backend. The
+    default \code{backend = "base"} uses base R graphics. With
+    \code{backend = "lcmsPlot"} the plot is generated with the (suggested)
+    \emph{lcmsPlot} package (\code{lp_spectra(scan_index = scan)}) and the
+    \emph{ggplot2}-based plot object is returned invisibly. \code{mzrange}
+    and \code{ident} are ignored on the lcmsPlot branch, which also does not
+    warn about an out-of-range \code{scan}.}
 }
 \seealso{
   \code{\link{xcmsRaw-class}}

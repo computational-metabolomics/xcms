@@ -11,7 +11,8 @@
 \section{Methods}{
 \describe{
 \item{object = "xcmsRaw"}{
-  \code{plotTIC(object, ident = FALSE, msident = FALSE)}
+  \code{plotTIC(object, ident = FALSE, msident = FALSE,
+                backend = c("base", "lcmsPlot"))}
 }
 }}
 \arguments{
@@ -22,6 +23,12 @@
   \item{msident}{
     logical, use mouse to identify and label spectral peaks
   }
+  \item{backend}{\code{character(1)} defining the plotting backend. The
+    default \code{backend = "base"} uses base R graphics. With
+    \code{backend = "lcmsPlot"} the plot is generated with the (suggested)
+    \emph{lcmsPlot} package (\code{lp_chromatogram(aggregation_fun = "sum")})
+    and the \emph{ggplot2}-based plot object is returned invisibly.
+    \code{ident} and \code{msident} are ignored on the lcmsPlot branch.}
 }
 \value{
   If \code{ident == TRUE}, an integer vector with the indecies of
